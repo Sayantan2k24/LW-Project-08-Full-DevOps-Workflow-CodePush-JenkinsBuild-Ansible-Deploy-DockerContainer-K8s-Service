@@ -1,0 +1,52 @@
+# Only to use when using Service-Accounts
+# rbac-config.yaml
+
+# first create a Service account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-ansible-sa # create with this name
+  namespace: devops
+---
+# create a secret containin the service account token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jenkins-ansible-sa-token
+  namespace: devops
+  annotations:
+    kubernetes.io/service-account.name: jenkins-ansible-sa # here attach the secret with the service account
+type: kubernetes.io/service-account-token
+---
+# create a role 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jenkins-ansible-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/exec", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets", "nodes"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses", "networkpolicies"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["ingresses", "deployments"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+---
+# Bind the role to jenkins-ansible-sa service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins-ansible-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: jenkins-ansible-role
+subjects:
+- kind: ServiceAccount
+  name: jenkins-ansible-sa
+  namespace: devops

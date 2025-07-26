@@ -1,0 +1,32 @@
+FROM ubuntu:22.04
+
+LABEL maintainer="sayantan2k21"
+
+# Install Docker and required tools
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    sudo \
+    bash \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create docker storage directory
+RUN mkdir -p /var/lib/docker
+
+# Create non-root user and give docker permissions
+RUN useradd -ms /bin/bash dockeruser && \
+    echo "dockeruser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    usermod -aG docker dockeruser
+
+RUN echo '#!/bin/bash' > /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'echo "▶️ Starting Docker daemon..."' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'sudo dockerd --host=unix:///var/run/docker.sock &' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'sleep 5' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'echo "✅ Docker daemon started."' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'tail -f /dev/null' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    chmod +x /usr/local/bin/dockerd-entrypoint.sh
+
+USER dockeruser
+WORKDIR /home/dockeruser
+
+ENTRYPOINT []

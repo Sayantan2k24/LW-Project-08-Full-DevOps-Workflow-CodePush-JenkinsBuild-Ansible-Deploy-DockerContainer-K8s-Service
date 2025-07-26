@@ -1,0 +1,28 @@
+FROM registry.access.redhat.com/ubi9/ubi:latest
+
+LABEL maintainer="sayantan2k21"
+
+# Install Docker CLI and Daemon (for RHEL-based)
+RUN dnf -y install git sudo dnf-utils \
+    && dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo \
+    && dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+    && dnf clean all
+
+RUN mkdir -p /var/lib/docker
+
+RUN useradd -ms /bin/bash dockeruser && \
+    echo "dockeruser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    usermod -aG docker dockeruser
+
+RUN echo '#!/bin/bash' > /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'echo "▶️ Starting Docker daemon..."' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'sudo dockerd --host=unix:///var/run/docker.sock &' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'sleep 5' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'echo "✅ Docker daemon started."' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    echo 'tail -f /dev/null' >> /usr/local/bin/dockerd-entrypoint.sh && \
+    chmod +x /usr/local/bin/dockerd-entrypoint.sh
+
+USER dockeruser
+WORKDIR /home/dockeruser
+
+ENTRYPOINT []

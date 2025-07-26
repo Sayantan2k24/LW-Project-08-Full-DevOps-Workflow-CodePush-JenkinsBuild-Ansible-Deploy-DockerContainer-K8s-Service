@@ -1,0 +1,12 @@
+✅ Deployment order:
+1️⃣ First create namespace:
+kubectl create namespace devops
+
+2️⃣ Apply PersistentVolume (no namespace needed, cluster scoped):
+kubectl apply -f jenkins-pv.yaml
+
+3️⃣ Apply PersistentVolumeClaim in namespace:
+kubectl apply -f jenkins-pvc.yaml -n devops
+
+4️⃣ Apply Deployment + Service together:
+kubectl apply -f jenkins-deployment.yaml -n devops

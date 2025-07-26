@@ -1,0 +1,84 @@
+
+# PRE SETUP GUIDE FOR JENKINS 
+
+## we will restrict the jenkins pod to run on the master node
+
+# kubectl get nodes -o wide
+# kubectl describe node <master-node-name>
+
+# will see something like this
+# Taints: node-role.kubernetes.io/control-plane:NoSchedule
+
+# remove taint from the master node
+# kubectl taint nodes <master-node-name> node-role.kubernetes.io/control-plane:NoSchedule-
+
+# add the label to the node
+# kubectl label nodes <master-node-name> node=master_node
+#  kubectl label nodes ip-172-31-83-18.ec2.internal  node=master_node
+# ------------------------------------------------------------------
+
+# jenkins-deployment.yaml
+# restrict to be launched in master node
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: devops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      serviceAccountName: jenkins-ansible-sa
+      nodeSelector:
+        node: master_node # manual Scheduling
+      tolerations: # applying toleration also # in case don't want to remove the taint from the node
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: jenkins
+        image: docker.io/sayantan2k21/jenkins-master:rhel9-v1
+        ports:
+        - containerPort: 8080
+        - containerPort: 50000
+        env:
+        - name: JENKINS_OPTS
+          value: "--httpPort=8080"
+        volumeMounts:
+        - name: jenkins-storage
+          mountPath: /var/lib/jenkins/.jenkins # mount to home of jenkins process # /var/lib/jenkins/.jenkins # can be defined in custom user
+        - name: kubectl-binary
+          mountPath: /usr/local/bin/kubectl # in master node kubectl should be present in this location
+        securityContext:
+          privileged: true
+      volumes:
+      - name: jenkins-storage
+        persistentVolumeClaim:
+          claimName: jenkins-pvc
+      - name: kubectl-binary
+        hostPath:
+          path: /usr/bin/kubectl # kubectl from base os
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins-service
+  namespace: devops
+spec:
+  selector:
+    app: jenkins
+  ports:
+  - name: web
+    port: 8080
+    targetPort: 8080
+    nodePort: 30080
+  - name: jnlp
+    port: 50000
+    targetPort: 50000
+  type: NodePort

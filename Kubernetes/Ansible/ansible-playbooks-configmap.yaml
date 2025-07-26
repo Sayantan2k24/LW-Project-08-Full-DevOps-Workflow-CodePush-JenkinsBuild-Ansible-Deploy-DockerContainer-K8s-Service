@@ -1,0 +1,123 @@
+# ansible-playbooks-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ansible-playbooks
+  namespace: devops
+data:
+  nginx-test.yml: |
+    ---
+    - name: Deploy Application to Kubernetes
+      hosts: localhost
+      connection: local
+      tasks:
+        - name: Create deployment
+          kubernetes.core.k8s:
+            name: sample-app
+            api_version: apps/v1
+            kind: Deployment
+            namespace: default
+            definition:
+              spec:
+                replicas: 3
+                selector:
+                  matchLabels:
+                    app: sample-app
+                template:
+                  metadata:
+                    labels:
+                      app: sample-app
+                  spec:
+                    containers:
+                    - name: app
+                      image: docker.io/nginx:latest
+                      ports:
+                      - containerPort: 80
+        
+        - name: Create service
+          kubernetes.core.k8s:
+            name: sample-app-service
+            api_version: v1
+            kind: Service
+            namespace: default
+            definition:
+              spec:
+                selector:
+                  app: sample-app
+                ports:
+                - port: 80
+                  targetPort: 80
+                type: ClusterIP  
+
+  deploy-app.yml: |
+    ---
+    - name: Deploy Application to Kubernetes
+      hosts: localhost
+      connection: local
+      tasks:
+        - name: Create deployment
+          kubernetes.core.k8s:
+            name: "{{ app_name }}"
+            api_version: apps/v1
+            kind: Deployment
+            namespace: default
+            definition:
+              metadata:
+                name: "{{ app_name }}"
+                labels:
+                  app: "{{ app_name }}"
+              spec:
+                replicas: 3
+                strategy: 
+                  type: RollingUpdate
+                  rollingUpdate:
+                    maxUnavailable: 1
+                    maxSurge: 1
+                selector:
+                  matchLabels:
+                    app: "{{ app_name }}"
+                template:
+                  metadata:
+                    labels:
+                      app: "{{ app_name }}"
+                  spec:
+                    containers:
+                    - name: "{{ app_name }}-container"
+                      image: "{{ image_name }}:{{ image_tag }}"
+                      ports:
+                      - containerPort: 5000
+
+        - name: Create service
+          kubernetes.core.k8s:
+            name: "{{ app_name }}-service"
+            api_version: v1
+            kind: Service
+            namespace: default
+            definition:
+              spec:
+                selector:
+                  app: "{{ app_name }}"
+                ports:
+                - port: 5000
+                  targetPort: 5000
+                  nodePort: 30500
+                type: NodePort
+
+  scale-deployment.yml: |
+    ---
+    - name: Scale Kubernetes Deployment
+      hosts: localhost
+      connection: local
+      vars:
+        deployment_name: "{{ app_name | default('sample-app') }}"
+        replica_count: "{{ replicas | default(5) }}"
+      tasks:
+        - name: Scale deployment
+          kubernetes.core.k8s:
+            name: "{{ app_name }}"
+            api_version: apps/v1
+            kind: Deployment
+            namespace: default
+            definition:
+              spec:
+                replicas: "{{ replica_count }}"

@@ -1,0 +1,43 @@
+---
+- name: Deploy Application to Kubernetes
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Create deployment
+      kubernetes.core.k8s:
+        name: "{{ app_name }}"
+        api_version: apps/v1
+        kind: Deployment
+        namespace: default
+        definition:
+          spec:
+            replicas: 3
+            selector:
+              matchLabels:
+                app: "{{ app_name }}"
+            template:
+              metadata:
+                labels:
+                  app: "{{ app_name }}"
+              spec:
+                containers:
+                - name: "{{ app_name }}-container"
+                  image: "docker.io/{{ image_name }}/{{ image_tag }}"
+                  ports:
+                  - containerPort: 5000
+
+    - name: Create service
+      kubernetes.core.k8s:
+        name: "{{ app_name }}-service"
+        api_version: v1
+        kind: Service
+        namespace: default
+        definition:
+          spec:
+            selector:
+              app: "{{ app_name }}"
+            ports:
+            - port: 5000
+              targetPort: 5000
+              nodePort: 30500
+            type: NodePort

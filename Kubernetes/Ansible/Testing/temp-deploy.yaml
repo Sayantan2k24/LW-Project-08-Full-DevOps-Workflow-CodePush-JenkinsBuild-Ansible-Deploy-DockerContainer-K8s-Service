@@ -1,0 +1,43 @@
+---
+- name: Deploy Application to Kubernetes
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Create deployment
+      kubernetes.core.k8s:
+        name: demo-flask
+        api_version: apps/v1
+        kind: Deployment
+        namespace: default
+        definition:
+          spec:
+            replicas: 3
+            selector:
+              matchLabels:
+                app: demo-flask
+            template:
+              metadata:
+                labels:
+                  app: demo-flask
+              spec:
+                containers:
+                - name: demo-flask-container
+                  image: docker.io/sayantan2k21/demo-flask:v17
+                  ports:
+                  - containerPort: 5000
+
+    - name: Create service
+      kubernetes.core.k8s:
+        name: demo-flask-service
+        api_version: v1
+        kind: Service
+        namespace: default
+        definition:
+          spec:
+            selector:
+              app: demo-flask
+            ports:
+            - port: 5000
+              targetPort: 5000
+              nodePort: 30500
+            type: NodePort

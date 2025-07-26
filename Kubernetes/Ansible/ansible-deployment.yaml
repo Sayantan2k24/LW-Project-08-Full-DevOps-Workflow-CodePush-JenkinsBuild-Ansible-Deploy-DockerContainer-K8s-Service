@@ -1,0 +1,86 @@
+# restrict it to run on Worker Node 1
+# Manual PRE SETUP
+# label worker node to worker_node01
+
+# ansible-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ansible
+  namespace: devops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ansible
+  template:
+    metadata:
+      labels:
+        app: ansible
+    spec:
+      serviceAccountName: jenkins-ansible-sa  
+      nodeSelector:  
+        node: worker_node01 # manual Scheduling
+
+      # define an init contnainer that copies files from one volume to another volume, writable
+      initContainers:
+        - name: copy-playbooks
+          image: busybox
+          command: ["/bin/sh", "-c", "cp -a /config/. /playbooks/ && chown -R 1000:1000 /playbooks/"] # copies everything inside /config/ (including hidden files like .ansible.cfg etc.) # 1000 for ansible user ID and Grp ID
+          volumeMounts:
+            - name: ansible-playbooks-config
+              mountPath: /config
+            - name: ansible-playbooks
+              mountPath: /playbooks
+
+      # define the main ansible container
+      containers:
+      - name: ansible
+        image: docker.io/sayantan2k21/ansible-master-minimal:rhel9-v1 # use base image # and setup manually
+        volumeMounts:
+        # mounting the writable volume with all the playbooks copied
+        - name: ansible-playbooks
+          mountPath: /home/ansible/playbooks
+
+        - name: ssh-keys
+          mountPath: /home/ansible/ssh-keys
+        - name: kubectl-binary
+          mountPath: /usr/local/bin/kubectl
+
+        - name: service-account-token
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+        env:
+        - name: ANSIBLE_HOST_KEY_CHECKING
+          value: "False"
+      volumes:
+      - name: ansible-playbooks # name of volume
+        emptyDir: {}   # Writable scratch volume
+
+      - name: ansible-playbooks-config # name of volume
+        configMap:
+          name: ansible-playbooks # name of configmap  # Read-only, this is where your YAML files are stored # already created before
+
+      - name: ssh-keys
+        secret:
+          secretName: ansible-ssh-keys
+          defaultMode: 0600
+      - name: kubectl-binary
+        hostPath:
+          path: /usr/bin/kubectl
+      - name: service-account-token
+        secret:
+          secretName: jenkins-ansible-sa-token
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ansible-service
+  namespace: devops
+spec:
+  selector:
+    app: ansible
+  ports:
+  - port: 22
+    targetPort: 22
+  clusterIP: None
